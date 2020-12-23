@@ -2,3 +2,4 @@ venv/
 .vscode/
 .env
 __pycache__/elasticpath.cpython-37.pyc
+temp.tmp

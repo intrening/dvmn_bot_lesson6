@@ -141,9 +141,9 @@ def create_product(name, slug, sku, description, amount, currency='RUB', manage_
 def create_file(file_url, public=True):
     response = requests.get(file_url)
     response.raise_for_status()
-    filename = 'temp'
-    with open(filename, 'wb') as file:
-        file.write(response.content)
+    filename = 'temp.tmp'
+    with open(filename, 'wb') as f:
+        f.write(response.content)
     url = 'https://api.moltin.com/v2/files'
     headers = {
         'Authorization': f'Bearer {get_ep_access_token()}',
