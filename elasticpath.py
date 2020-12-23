@@ -35,11 +35,11 @@ def get_ep_access_token():
     global EP_TOKEN_TIME
 
     if not EP_ACCESS_TOKEN or datetime.now() > EP_TOKEN_TIME + timedelta(hours=1):
-        client_id = os.environ.get('EP_CLIENT_ID')
         url = 'https://api.moltin.com/oauth/access_token'
         payload = {
-            'client_id': client_id,
-            'grant_type': 'implicit',
+            'grant_type': 'client_credentials',
+            'client_secret': os.environ.get('EP_CLIENT_SECRET'),
+            'client_id': os.environ.get('EP_CLIENT_ID'),
         }
         response = requests.post(url, data=payload)
         response.raise_for_status()
@@ -107,3 +107,32 @@ def create_customer(name, email):
     }
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
+
+
+def create_product(name, slug, sku, description, amount, currency='RUB', manage_stock=False, includes_tax=True, status='live', commodity_type='physical'):
+    url = 'https://api.moltin.com/v2/products'
+    headers = {
+        'Authorization': f'Bearer {get_ep_access_token()}',
+    }
+    payload = {
+        'data': {
+            'type': 'product',
+            'name': name,
+            'slug': slug,
+            'sku': sku,
+            'manage_stock': manage_stock,
+            'description': description,
+            'price': [
+                {
+                    'amount': amount,
+                    'currency': currency,
+                    'includes_tax': includes_tax,
+                }
+            ],
+            'status': 'live',
+            'commodity_type': commodity_type,
+        }
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return response.json()['data']['id']
