@@ -188,4 +188,30 @@ def create_flow(name, slug, description, enabled=True):
     response.raise_for_status()
     return response.json()['data']['id']
 
-flow_id = create_flow('pizzeria', 'pizzeria', 'Пиццерии')
+def create_field(name, slug, field_type, description, required, enabled, flow_id):
+    url = 'https://api.moltin.com/v2/fields'
+    headers = {
+        'Authorization': f'Bearer {get_ep_access_token()}',
+    }
+    payload = {
+        'data': {
+            'type': 'field',
+            'name': name,
+            'slug': slug,
+            'field_type': field_type,
+            'description': description,
+            'required': required,
+            'enabled': enabled,
+            'relationships': {
+                'flow': {
+                    'data': {
+                        'type': 'flow',
+                        'id': flow_id,
+                    }
+                }
+            }
+        }
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return response.json()['data']['id']
