@@ -215,3 +215,22 @@ def create_field(name, slug, field_type, description, required, enabled, flow_id
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
     return response.json()['data']['id']
+
+
+def create_entry(flow_slug, address, alias, longitude, latitude):
+    url = f'https://api.moltin.com/v2/flows/{flow_slug}/entries'
+    headers = {
+        'Authorization': f'Bearer {get_ep_access_token()}',
+    }
+    payload = {
+        'data': {
+            'type': 'entry',
+            'address': address,
+            'Alias': alias,
+            'Longitude': longitude,
+            'Latitude': latitude,
+        }
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return response.json()['data']['id']
