@@ -1,3 +1,5 @@
 requests==2.25.0
 slugify==0.0.1
-python-slugify-4.0.1
+python-slugify==4.0.1
+python-telegram-bot==11.1.0
+redis==3.2.1
