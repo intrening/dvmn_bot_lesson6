@@ -5,7 +5,7 @@ import redis
 from telegram_logger import TelegramLogsHandler
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 
 from elasticpath import (
     fetch_products, get_product, get_image_url,
@@ -19,7 +19,7 @@ logger = logging.getLogger("dvmn_bot_telegram")
 
 def start(bot, update):
     reply_markup = get_menu_keyboard_markup()
-    update.message.reply_text('Please choose:', reply_markup=reply_markup)
+    update.message.reply_text('Выберите пиццу:', reply_markup=reply_markup)
     return "HANDLE_MENU"
 
 
@@ -40,14 +40,14 @@ def handle_menu(bot, update):
             price_per_unit = item_info['unit']['amount']
             price = item_info['value']['amount']
             quantity = int(float(price)/float(price_per_unit))
-            cart_info += f"{name}\n{description}\nСтоимость: {price_per_unit}\n\nКоличество в корзине: {quantity} на сумму {price} руб\n\n"
+            cart_info += f"<b>{name}</b>\n{description}\nСтоимость: {price_per_unit}\n\nКоличество в корзине: {quantity} на сумму {price} руб\n\n"
 
             keyboard.append(
                 [InlineKeyboardButton(
                     f'Убрать из корзины {name}', callback_data=product_cart_id
                 )]
             )
-        cart_info += f'Всего: {get_total_price(chat_id=query.message.chat_id)}'
+        cart_info += f'<b>Всего:</b> {get_total_price(chat_id=query.message.chat_id)}'
         keyboard += [
             [InlineKeyboardButton('Оплатить', callback_data='WAITING_EMAIL')],
             [InlineKeyboardButton('В меню', callback_data='HANDLE_MENU')]
@@ -56,6 +56,7 @@ def handle_menu(bot, update):
             text=cart_info,
             chat_id=query.message.chat_id,
             reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode=ParseMode.HTML,
         )
         return 'HANDLE_CART'
 
