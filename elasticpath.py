@@ -141,7 +141,7 @@ def create_product(name, slug, sku, description, amount, currency='RUB', manage_
 def create_file(file_url, public=True):
     response = requests.get(file_url)
     response.raise_for_status()
-    filename = 'temp.tmp'
+    filename = file_url.split('/')[-1]
     with open(filename, 'wb') as f:
         f.write(response.content)
     url = 'https://api.moltin.com/v2/files'
@@ -154,6 +154,7 @@ def create_file(file_url, public=True):
     }
     response = requests.post(url, files=files, headers=headers)
     response.raise_for_status()
+    os.remove(filename)
     return response.json()['data']['id']
 
 
