@@ -1,5 +1,5 @@
 venv/
 .vscode/
 .env
-__pycache__/elasticpath.cpython-37.pyc
 temp.tmp
+__pycache__/

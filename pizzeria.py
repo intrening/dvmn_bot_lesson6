@@ -1,6 +1,6 @@
 import json
 import slugify
-from  elasticpath import (
+from elasticpath import (
     create_product, create_file, create_relationships,
     create_entry,
 )
@@ -20,6 +20,7 @@ def create_products(json_filename):
         )
         file_id = create_file(file_url=menu_item['product_image']['url'])
         create_relationships(product_id, file_id)
+
 
 def create_pizzerias(json_filename):
     with open(json_filename, 'r') as f:

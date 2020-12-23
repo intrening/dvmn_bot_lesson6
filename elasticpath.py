@@ -156,6 +156,7 @@ def create_file(file_url, public=True):
     response.raise_for_status()
     return response.json()['data']['id']
 
+
 def create_relationships(product_id, file_id):
     url = f'https://api.moltin.com/v2/products/{product_id}/relationships/main-image'
     headers = {
@@ -169,6 +170,7 @@ def create_relationships(product_id, file_id):
     }
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
+
 
 def create_flow(name, slug, description, enabled=True):
     url = 'https://api.moltin.com/v2/flows'
@@ -187,6 +189,7 @@ def create_flow(name, slug, description, enabled=True):
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
     return response.json()['data']['id']
+
 
 def create_field(name, slug, field_type, description, required, enabled, flow_id):
     url = 'https://api.moltin.com/v2/fields'
