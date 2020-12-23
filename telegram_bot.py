@@ -104,6 +104,10 @@ def handle_description(bot, update):
         quantity=quantity,
         chat_id=query.message.chat_id
     )
+    bot.answer_callback_query(
+        callback_query_id=update.callback_query.id,
+        text="Товар успешно добавлен в корзину!"
+    )
     return 'HANDLE_DESCRIPTION'
 
 
