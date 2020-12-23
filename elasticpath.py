@@ -169,3 +169,23 @@ def create_relationships(product_id, file_id):
     }
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
+
+def create_flow(name, slug, description, enabled=True):
+    url = 'https://api.moltin.com/v2/flows'
+    headers = {
+        'Authorization': f'Bearer {get_ep_access_token()}',
+    }
+    payload = {
+        'data': {
+            'type': 'flow',
+            'name': name,
+            'slug': slug,
+            'description': description,
+            'enabled': enabled,
+        }
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return response.json()['data']['id']
+
+flow_id = create_flow('pizzeria', 'pizzeria', 'Пиццерии')
