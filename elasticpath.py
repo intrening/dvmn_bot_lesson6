@@ -144,7 +144,6 @@ def create_file(file_url, public=True):
     filename = 'temp'
     with open(filename, 'wb') as file:
         file.write(response.content)
-
     url = 'https://api.moltin.com/v2/files'
     headers = {
         'Authorization': f'Bearer {get_ep_access_token()}',
@@ -156,3 +155,17 @@ def create_file(file_url, public=True):
     response = requests.post(url, files=files, headers=headers)
     response.raise_for_status()
     return response.json()['data']['id']
+
+def create_relationships(product_id, file_id):
+    url = f'https://api.moltin.com/v2/products/{product_id}/relationships/main-image'
+    headers = {
+        'Authorization': f'Bearer {get_ep_access_token()}',
+    }
+    payload = {
+        'data': {
+            'type': 'main_image',
+            'id': file_id,
+        }
+    }
+    response = requests.post(url, json=payload, headers=headers)
+    response.raise_for_status()
