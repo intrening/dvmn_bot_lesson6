@@ -6,6 +6,7 @@ from telegram_logger import TelegramLogsHandler
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+from validate_email import validate_email
 
 from elasticpath import (
     fetch_products, get_product, get_image_url,
@@ -151,10 +152,17 @@ def handle_cart(bot, update):
     return 'HANDLE_CART'
 
 
-def waiting_email(bot, update):
+def handle_waiting(bot, update):
+    email = update.message.text
+    if not validate_email(email):
+        bot.send_message(
+            text='Введите корректный емайл',
+            chat_id=update.message.chat_id,
+        )
+        return 'HANDLE_WAITING'
     create_customer(
         name=update.message.chat.first_name,
-        email=update.message.text,
+        email=email,
     )
     bot.send_message(
             text='Ваш емайл добавлен в CRM',
@@ -200,7 +208,7 @@ def handle_users_reply(bot, update):
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
-        'WAITING_EMAIL': waiting_email,
+        'HANDLE_WAITING': handle_waiting,
     }
     state_handler = states_functions[user_state]
     next_state = state_handler(bot, update)
@@ -223,6 +231,15 @@ def error_handler(bot, update, err):
     logger.error(err)
 
 
+def location(bot, update):
+    message = None
+    if update.edited_message:
+        message = update.edited_message
+    else:
+        message = update.message
+    current_pos = (message.location.latitude, message.location.longitude)
+
+
 if __name__ == '__main__':
     debug_bot_token = os.environ['DEBUG_TELEGRAM_BOT_TOKEN']
     debug_chat_id = os.environ['DEBUG_TELEGRAM_CHAT_ID']
@@ -239,6 +256,7 @@ if __name__ == '__main__':
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
+    dispatcher.add_handler(MessageHandler(Filters.location, location))
 
     logger.info('Бот Интернет-магазина в Telegram запущен')
     updater.start_polling()
