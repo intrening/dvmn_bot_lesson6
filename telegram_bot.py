@@ -1,6 +1,7 @@
 import os
 import logging
 import redis
+import requests
 
 from telegram_logger import TelegramLogsHandler
 from telegram.ext import Filters, Updater
@@ -152,23 +153,23 @@ def handle_cart(bot, update):
     return 'HANDLE_CART'
 
 
-def handle_waiting(bot, update):
+def waiting_email(bot, update):
     email = update.message.text
     if not validate_email(email):
         bot.send_message(
             text='Введите корректный емайл',
             chat_id=update.message.chat_id,
         )
-        return 'HANDLE_WAITING'
+        return 'WAITING_EMAIL'
     create_customer(
         name=update.message.chat.first_name,
         email=email,
     )
     bot.send_message(
-            text='Ваш емайл добавлен в CRM',
+            text='Ваш емайл добавлен в CRM, напишите ваш адрес текстом или отправьте геолокацию',
             chat_id=update.message.chat_id,
         )
-    return 'HANDLE_CART'
+    return 'HANDLE_WAITING_ADRESS'
 
 
 def get_menu_keyboard_markup(page=1):
@@ -208,7 +209,8 @@ def handle_users_reply(bot, update):
         'HANDLE_MENU': handle_menu,
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
-        'HANDLE_WAITING': handle_waiting,
+        'WAITING_EMAIL': waiting_email,
+        'HANDLE_WAITING_ADRESS': handle_waiting_adress,
     }
     state_handler = states_functions[user_state]
     next_state = state_handler(bot, update)
@@ -231,13 +233,25 @@ def error_handler(bot, update, err):
     logger.error(err)
 
 
-def location(bot, update):
-    message = None
+def handle_waiting_adress(bot, update):
     if update.edited_message:
         message = update.edited_message
     else:
         message = update.message
-    current_pos = (message.location.latitude, message.location.longitude)
+    if message.location:
+        current_pos = (message.location.latitude, message.location.longitude)
+    current_pos = (fetch_coordinates(apikey=os.getenv('YANDEX_GEO_API'), place=update.message.text))
+
+
+def fetch_coordinates(apikey, place):
+    base_url = "https://geocode-maps.yandex.ru/1.x"
+    params = {"geocode": place, "apikey": apikey, "format": "json"}
+    response = requests.get(base_url, params=params)
+    response.raise_for_status()
+    places_found = response.json()['response']['GeoObjectCollection']['featureMember']
+    most_relevant = places_found[0]
+    lon, lat = most_relevant['GeoObject']['Point']['pos'].split(" ")
+    return lon, lat
 
 
 if __name__ == '__main__':
@@ -255,8 +269,8 @@ if __name__ == '__main__':
     dispatcher.add_error_handler(error_handler)
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
+    dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
-    dispatcher.add_handler(MessageHandler(Filters.location, location))
 
     logger.info('Бот Интернет-магазина в Telegram запущен')
     updater.start_polling()
