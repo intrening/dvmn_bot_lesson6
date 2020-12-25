@@ -16,6 +16,8 @@ from elasticpath import (
 _database = None
 logger = logging.getLogger("dvmn_bot_telegram")
 
+PRODUCTS_ON_PAGE = 8
+
 
 def start(bot, update):
     reply_markup = get_menu_keyboard_markup()
@@ -59,6 +61,15 @@ def handle_menu(bot, update):
             parse_mode=ParseMode.HTML,
         )
         return 'HANDLE_CART'
+
+    if 'page' in query.data:
+        page = int(query.data.split(' ')[-1])
+        bot.send_message(
+            text='Meню:',
+            chat_id=query.message.chat_id,
+            reply_markup=get_menu_keyboard_markup(page=page),
+        )
+        return 'HANDLE_MENU'
 
     product = get_product(product_id=query.data)
     price = product['price'][0]['amount']
@@ -152,13 +163,20 @@ def waiting_email(bot, update):
     return 'HANDLE_CART'
 
 
-def get_menu_keyboard_markup():
+def get_menu_keyboard_markup(page=1):
+    products = fetch_products()
+    first_product_num = (page-1)*PRODUCTS_ON_PAGE
+    navigation_list = [] if page == 1 else [InlineKeyboardButton('<<<', callback_data=f'page {page-1}')]
+    if page*PRODUCTS_ON_PAGE < len(products):
+        last_product_num = page*PRODUCTS_ON_PAGE
+        navigation_list.append(InlineKeyboardButton('>>>', callback_data=f'page {page+1}'))
+    else:
+        last_product_num = len(products)
     keyboard = [
-        [InlineKeyboardButton(prod['name'], callback_data=prod['id'])] for prod in fetch_products()
+        [InlineKeyboardButton(prod['name'], callback_data=prod['id'])] for prod in products[first_product_num:last_product_num]
     ]
-    keyboard.append(
-        [InlineKeyboardButton('Корзина', callback_data='HANDLE_CART')]
-    )
+    keyboard.append(navigation_list)
+    keyboard.append([InlineKeyboardButton('Корзина', callback_data='HANDLE_CART')])
     return InlineKeyboardMarkup(keyboard)
 
 
