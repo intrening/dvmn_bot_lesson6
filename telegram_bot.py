@@ -2,6 +2,7 @@ import os
 import logging
 import redis
 import requests
+from requests.models import RequestEncodingMixin
 
 from telegram_logger import TelegramLogsHandler
 from telegram.ext import Filters, Updater
@@ -240,7 +241,19 @@ def handle_waiting_adress(bot, update):
         message = update.message
     if message.location:
         current_pos = (message.location.latitude, message.location.longitude)
-    current_pos = (fetch_coordinates(apikey=os.getenv('YANDEX_GEO_API'), place=update.message.text))
+    else:
+        current_pos = (fetch_coordinates(apikey=os.getenv('YANDEX_GEO_API'), place=update.message.text))
+        if not current_pos:
+            bot.send_message(
+                text='Введите корректный адрес',
+                chat_id=update.message.chat_id,
+            )
+            return 'HANDLE_WAITING_ADRESS'
+    bot.send_message(
+        text=f'Ваши координаты: {current_pos[0]}, {current_pos[1]}',
+        chat_id=update.message.chat_id,
+    )
+    return 'HANDLE_WAITING_ADRESS'
 
 
 def fetch_coordinates(apikey, place):
@@ -248,10 +261,13 @@ def fetch_coordinates(apikey, place):
     params = {"geocode": place, "apikey": apikey, "format": "json"}
     response = requests.get(base_url, params=params)
     response.raise_for_status()
-    places_found = response.json()['response']['GeoObjectCollection']['featureMember']
-    most_relevant = places_found[0]
-    lon, lat = most_relevant['GeoObject']['Point']['pos'].split(" ")
-    return lon, lat
+    try:
+        places_found = response.json()['response']['GeoObjectCollection']['featureMember']
+        most_relevant = places_found[0]
+        lon, lat = most_relevant['GeoObject']['Point']['pos'].split(" ")
+        return lon, lat
+    except IndexError:
+        return None
 
 
 if __name__ == '__main__':
