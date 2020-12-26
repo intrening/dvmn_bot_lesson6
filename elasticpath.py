@@ -238,3 +238,13 @@ def create_entry(flow_slug, address, alias, longitude, latitude):
     response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
     return response.json()['data']['id']
+
+
+def get_entries(flow_slug):
+    url = f'https://api.moltin.com/v2/flows/{flow_slug}/entries'
+    headers = {
+        'Authorization': f'Bearer {get_ep_access_token()}',
+    }
+    response = requests.get(url, headers=headers)
+    response.raise_for_status()
+    return response.json()['data']

@@ -2,18 +2,18 @@ import os
 import logging
 import redis
 import requests
-from requests.models import RequestEncodingMixin
 
 from telegram_logger import TelegramLogsHandler
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from validate_email import validate_email
+from geopy import distance
 
 from elasticpath import (
     fetch_products, get_product, get_image_url,
     add_to_cart, get_carts_products, get_total_price,
-    remove_from_cart, create_customer,
+    remove_from_cart, create_customer, get_entries,
 )
 
 _database = None
@@ -170,7 +170,7 @@ def waiting_email(bot, update):
             text='Ваш емайл добавлен в CRM, напишите ваш адрес текстом или отправьте геолокацию',
             chat_id=update.message.chat_id,
         )
-    return 'HANDLE_WAITING_ADRESS'
+    return 'HANDLE_WAITING_ADDRESS'
 
 
 def get_menu_keyboard_markup(page=1):
@@ -211,7 +211,7 @@ def handle_users_reply(bot, update):
         'HANDLE_DESCRIPTION': handle_description,
         'HANDLE_CART': handle_cart,
         'WAITING_EMAIL': waiting_email,
-        'HANDLE_WAITING_ADRESS': handle_waiting_adress,
+        'HANDLE_WAITING_ADDRESS': handle_waiting_address,
     }
     state_handler = states_functions[user_state]
     next_state = state_handler(bot, update)
@@ -234,7 +234,7 @@ def error_handler(bot, update, err):
     logger.error(err)
 
 
-def handle_waiting_adress(bot, update):
+def handle_waiting_address(bot, update):
     if update.edited_message:
         message = update.edited_message
     else:
@@ -248,12 +248,53 @@ def handle_waiting_adress(bot, update):
                 text='Введите корректный адрес',
                 chat_id=update.message.chat_id,
             )
-            return 'HANDLE_WAITING_ADRESS'
+            return 'HANDLE_WAITING_ADDRESS'
+    nearest_pizzeria = get_nearest_pizzeria(current_pos)
+    distance = round(nearest_pizzeria['distance'], 1)
+    if distance > 20:
+        text = f'''
+        Расстояние до вас: {distance} км.,
+        так далеко мы не сможем доставить пиццу, она остынет!
+        Введите другой адрес.
+        '''
+        bot.send_message(
+            text=text,
+            chat_id=update.message.chat_id,
+        )
+        return 'HANDLE_WAITING_ADDRESS'
+    if distance <= 0.5:
+        text = f'''
+        Ближайшая пиццерия находится всего в {distance} км.,
+        заберете ее самостоятельно? Адрес: {nearest_pizzeria["address"]}'.
+        А можем доставить и бесплатно.
+        '''
+    elif distance <= 5:
+        text = f'''
+        Расстояние до вас: {distance} км.,
+        похоже, придется ехать к вам на самокате. Доставка с пиццерии по адресу {nearest_pizzeria["address"]}
+        будет стоить 100 руб. Доставляем?
+        '''
+    elif distance <= 20:
+        text = f'''
+        Расстояние до вас: {distance} км.,
+        похоже, придется ехать к вам на машине. Доставка с пиццерии по адресу {nearest_pizzeria["address"]}
+        будет стоить 300 руб. Доставляем?
+        '''
     bot.send_message(
-        text=f'Ваши координаты: {current_pos[0]}, {current_pos[1]}',
+        text=text,
         chat_id=update.message.chat_id,
     )
-    return 'HANDLE_WAITING_ADRESS'
+    return 'HANDLE_WAITING_ADDRESS'
+
+
+def get_nearest_pizzeria(current_pos):
+    pizzerias = get_entries('pizzeria')
+    for pizzeria in pizzerias:
+        pizzeria['distance'] = distance.distance(
+            (pizzeria['Longitude'], pizzeria['Latitude']),
+            current_pos,
+        ).km
+    return min(pizzerias, key=lambda x: x['distance'])
 
 
 def fetch_coordinates(apikey, place):
