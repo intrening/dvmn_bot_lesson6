@@ -235,6 +235,21 @@ def create_entry(flow_slug, data):
     return response.json()['data']['id']
 
 
+def update_entry(flow_slug, entry_id, data):
+    url = f'https://api.moltin.com/v2/flows/{flow_slug}/entries/{entry_id}'
+    headers = {
+        'Authorization': f'Bearer {get_ep_access_token()}',
+    }
+    data['type'] = 'entry'
+    data['id'] = 'entryID'
+    payload = {
+        'data': data,
+    }
+    response = requests.put(url, json=payload, headers=headers)
+    response.raise_for_status()
+    return response.json()['data']['id']
+
+
 def get_entries(flow_slug):
     url = f'https://api.moltin.com/v2/flows/{flow_slug}/entries'
     headers = {
@@ -243,3 +258,9 @@ def get_entries(flow_slug):
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     return response.json()['data']
+
+
+# for pizzeria in get_entries('pizzeria'):
+#     update_entry('pizzeria', pizzeria['id'], data={
+#         'deliver_telegram_id': '36638324',
+#     })
