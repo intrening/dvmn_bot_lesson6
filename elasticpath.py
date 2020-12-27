@@ -258,9 +258,3 @@ def get_entries(flow_slug):
     response = requests.get(url, headers=headers)
     response.raise_for_status()
     return response.json()['data']
-
-
-# for pizzeria in get_entries('pizzeria'):
-#     update_entry('pizzeria', pizzeria['id'], data={
-#         'deliver_telegram_id': '36638324',
-#     })

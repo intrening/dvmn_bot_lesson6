@@ -261,16 +261,32 @@ def handle_waiting_address(bot, update):
 
 def handle_waiting_delivery_choice(bot, update):
     query = update.callback_query
+    customer_addresses = get_entries('customeraddress')
+    customer_address = [
+        address for address in customer_addresses if address['telegram_chat_id'] == str(query.message.chat_id)
+    ][0]
+    pizzeria = get_nearest_pizzeria(
+        (customer_address['longitude'], customer_address['latitude'])
+    )
     if query.data == 'PICKUP':
         bot.delete_message(
             chat_id=query.message.chat_id,
             message_id=query.message.message_id,
         )
         bot.send_message(
-            text=f'Мы уже начали готовить пиццу, она ждет вас у нас в пиццерии',
+            text=f'Мы начали готовить пиццу, заберите ее по адресу: {pizzeria["address"]}',
             chat_id=query.message.chat_id,
         )
         return 'START'
+    bot.send_message(
+        text=f'Клиент заказал пиццу, надо доставить',
+        chat_id=pizzeria['deliver_telegram_id'],
+    )
+    bot.send_location(
+        chat_id=pizzeria['deliver_telegram_id'],
+        longitude=customer_address['longitude'],
+        latitude=customer_address['latitude'],
+    )
     return 'HANDLE_WAITING_ADDRESS'
 
 
