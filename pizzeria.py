@@ -29,8 +29,10 @@ def create_pizzerias(json_filename):
     for pizzeria in pizzerias:
         create_entry(
             flow_slug='pizzeria',
-            address=pizzeria['address']['full'],
-            alias=pizzeria['alias'],
-            longitude=pizzeria['coordinates']['lon'],
-            latitude=pizzeria['coordinates']['lat'],
+            data={
+                'address': pizzeria['address']['full'],
+                'alias': pizzeria['alias'],
+                'longitude': pizzeria['coordinates']['lon'],
+                'latitude': pizzeria['coordinates']['lat'],
+            },
         )
