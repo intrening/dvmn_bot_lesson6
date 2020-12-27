@@ -14,6 +14,7 @@ from elasticpath import (
     fetch_products, get_product, get_image_url,
     add_to_cart, get_carts_products, get_total_price,
     remove_from_cart, create_customer, get_entries,
+    create_entry,
 )
 
 _database = None
@@ -190,50 +191,6 @@ def get_menu_keyboard_markup(page=1):
     return InlineKeyboardMarkup(keyboard)
 
 
-def handle_users_reply(bot, update):
-    db = get_database_connection()
-    if update.message:
-        user_reply = update.message.text
-        chat_id = update.message.chat_id
-    elif update.callback_query:
-        user_reply = update.callback_query.data
-        chat_id = update.callback_query.message.chat_id
-    else:
-        return
-    if user_reply == '/start':
-        user_state = 'START'
-    else:
-        user_state = db.get(chat_id).decode("utf-8")
-
-    states_functions = {
-        'START': start,
-        'HANDLE_MENU': handle_menu,
-        'HANDLE_DESCRIPTION': handle_description,
-        'HANDLE_CART': handle_cart,
-        'WAITING_EMAIL': waiting_email,
-        'HANDLE_WAITING_ADDRESS': handle_waiting_address,
-    }
-    state_handler = states_functions[user_state]
-    next_state = state_handler(bot, update)
-    db.set(chat_id, next_state)
-
-
-def get_database_connection():
-    global _database
-    if _database is None:
-        database_password = os.getenv("REDIS_PASSWORD")
-        database_host = os.getenv("REDIS_HOST")
-        database_port = os.getenv("REDIS_PORT")
-        _database = redis.Redis(
-            host=database_host, port=database_port, password=database_password
-        )
-    return _database
-
-
-def error_handler(bot, update, err):
-    logger.error(err)
-
-
 def handle_waiting_address(bot, update):
     if update.edited_message:
         message = update.edited_message
@@ -251,6 +208,7 @@ def handle_waiting_address(bot, update):
             return 'HANDLE_WAITING_ADDRESS'
     nearest_pizzeria = get_nearest_pizzeria(current_pos)
     distance = round(nearest_pizzeria['distance'], 1)
+    pizzeria_address = nearest_pizzeria["address"]
     if distance > 20:
         text = f'''
         Расстояние до вас: {distance} км.,
@@ -265,25 +223,54 @@ def handle_waiting_address(bot, update):
     if distance <= 0.5:
         text = f'''
         Ближайшая пиццерия находится всего в {distance} км.,
-        заберете ее самостоятельно? Адрес: {nearest_pizzeria["address"]}'.
+        вы можете забрать ее самостоятельно. Адрес: {pizzeria_address}'.
         А можем доставить и бесплатно.
         '''
     elif distance <= 5:
         text = f'''
         Расстояние до вас: {distance} км.,
-        похоже, придется ехать к вам на самокате. Доставка с пиццерии по адресу {nearest_pizzeria["address"]}
-        будет стоить 100 руб. Доставляем?
+        похоже, придется ехать к вам на самокате. Доставка с пиццерии по адресу {pizzeria_address}
+        будет стоить 100 руб.
         '''
     elif distance <= 20:
         text = f'''
         Расстояние до вас: {distance} км.,
-        похоже, придется ехать к вам на машине. Доставка с пиццерии по адресу {nearest_pizzeria["address"]}
-        будет стоить 300 руб. Доставляем?
+        похоже, придется ехать к вам на машине. Доставка с пиццерии по адресу {pizzeria_address}
+        будет стоить 300 руб.
         '''
+    create_entry(flow_slug='customeraddress', data={
+        'telegram_chat_id': update.message.chat_id,
+        'longitude': current_pos[0],
+        'latitude': current_pos[1],
+    })
     bot.send_message(
         text=text,
         chat_id=update.message.chat_id,
     )
+    keyboard = [
+        [InlineKeyboardButton('Самовывоз', callback_data='PICKUP')],
+        [InlineKeyboardButton('Доставка', callback_data='DELIVERY')]
+    ]
+    bot.send_message(
+        text='Выберите вариант доставки',
+        chat_id=update.message.chat_id,
+        reply_markup=InlineKeyboardMarkup(keyboard),
+    )
+    return 'HANDLE_WAITING_DELIVERY_CHOICE'
+
+
+def handle_waiting_delivery_choice(bot, update):
+    query = update.callback_query
+    if query.data == 'PICKUP':
+        bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+        )
+        bot.send_message(
+            text=f'Мы уже начали готовить пиццу, она ждет вас у нас в пиццерии',
+            chat_id=query.message.chat_id,
+        )
+        return 'START'
     return 'HANDLE_WAITING_ADDRESS'
 
 
@@ -309,6 +296,51 @@ def fetch_coordinates(apikey, place):
         return lon, lat
     except IndexError:
         return None
+
+
+def handle_users_reply(bot, update):
+    db = get_database_connection()
+    if update.message:
+        user_reply = update.message.text
+        chat_id = update.message.chat_id
+    elif update.callback_query:
+        user_reply = update.callback_query.data
+        chat_id = update.callback_query.message.chat_id
+    else:
+        return
+    if user_reply == '/start':
+        user_state = 'START'
+    else:
+        user_state = db.get(chat_id).decode("utf-8")
+
+    states_functions = {
+        'START': start,
+        'HANDLE_MENU': handle_menu,
+        'HANDLE_DESCRIPTION': handle_description,
+        'HANDLE_CART': handle_cart,
+        'WAITING_EMAIL': waiting_email,
+        'HANDLE_WAITING_ADDRESS': handle_waiting_address,
+        'HANDLE_WAITING_DELIVERY_CHOICE': handle_waiting_delivery_choice,
+    }
+    state_handler = states_functions[user_state]
+    next_state = state_handler(bot, update)
+    db.set(chat_id, next_state)
+
+
+def get_database_connection():
+    global _database
+    if _database is None:
+        database_password = os.getenv("REDIS_PASSWORD")
+        database_host = os.getenv("REDIS_HOST")
+        database_port = os.getenv("REDIS_PORT")
+        _database = redis.Redis(
+            host=database_host, port=database_port, password=database_password
+        )
+    return _database
+
+
+def error_handler(bot, update, err):
+    logger.error(err)
 
 
 if __name__ == '__main__':
