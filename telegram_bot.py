@@ -21,15 +21,16 @@ _database = None
 logger = logging.getLogger("dvmn_bot_telegram")
 
 PRODUCTS_ON_PAGE = 8
+DELIVERY_TIME = 60*60
 
 
-def start(bot, update):
+def start(bot, update, job_queue):
     reply_markup = get_menu_keyboard_markup()
     update.message.reply_text('Выберите пиццу:', reply_markup=reply_markup)
     return "HANDLE_MENU"
 
 
-def handle_menu(bot, update):
+def handle_menu(bot, update, job_queue):
     query = update.callback_query
     bot.delete_message(
         chat_id=query.message.chat_id,
@@ -100,7 +101,7 @@ def handle_menu(bot, update):
     return 'HANDLE_DESCRIPTION'
 
 
-def handle_description(bot, update):
+def handle_description(bot, update, job_queue):
     query = update.callback_query
     if query.data == 'HANDLE_MENU':
         bot.delete_message(
@@ -127,7 +128,7 @@ def handle_description(bot, update):
     return 'HANDLE_DESCRIPTION'
 
 
-def handle_cart(bot, update):
+def handle_cart(bot, update, job_queue):
     query = update.callback_query
     if query.data == 'WAITING_EMAIL':
         bot.delete_message(
@@ -155,7 +156,7 @@ def handle_cart(bot, update):
     return 'HANDLE_CART'
 
 
-def waiting_email(bot, update):
+def waiting_email(bot, update, job_queue):
     email = update.message.text
     if not validate_email(email):
         bot.send_message(
@@ -191,7 +192,7 @@ def get_menu_keyboard_markup(page=1):
     return InlineKeyboardMarkup(keyboard)
 
 
-def handle_waiting_address(bot, update):
+def handle_waiting_address(bot, update, job_queue):
     if update.edited_message:
         message = update.edited_message
     else:
@@ -259,8 +260,16 @@ def handle_waiting_address(bot, update):
     return 'HANDLE_WAITING_DELIVERY_CHOICE'
 
 
-def handle_waiting_delivery_choice(bot, update):
+def callback_alarm(bot, job):
+    bot.send_message(
+        chat_id=job.context,
+        text='Приятного аппетита! *место для рекламы* *сообщение что делать если пицца не пришла*',
+    )
+
+
+def handle_waiting_delivery_choice(bot, update, job_queue):
     query = update.callback_query
+    job_queue.run_once(callback_alarm, DELIVERY_TIME, context=query.message.chat_id)
     customer_addresses = get_entries('customeraddress')
     customer_address = [
         address for address in customer_addresses if address['telegram_chat_id'] == str(query.message.chat_id)
@@ -314,7 +323,7 @@ def fetch_coordinates(apikey, place):
         return None
 
 
-def handle_users_reply(bot, update):
+def handle_users_reply(bot, update, job_queue):
     db = get_database_connection()
     if update.message:
         user_reply = update.message.text
@@ -339,7 +348,7 @@ def handle_users_reply(bot, update):
         'HANDLE_WAITING_DELIVERY_CHOICE': handle_waiting_delivery_choice,
     }
     state_handler = states_functions[user_state]
-    next_state = state_handler(bot, update)
+    next_state = state_handler(bot, update, job_queue)
     db.set(chat_id, next_state)
 
 
@@ -355,7 +364,7 @@ def get_database_connection():
     return _database
 
 
-def error_handler(bot, update, err):
+def error_handler(bot, update, job_queue, err):
     logger.error(err)
 
 
@@ -372,10 +381,10 @@ if __name__ == '__main__':
     updater = Updater(token)
     dispatcher = updater.dispatcher
     dispatcher.add_error_handler(error_handler)
-    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
-    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
-    dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply))
-    dispatcher.add_handler(CommandHandler('start', handle_users_reply))
+    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply, pass_job_queue=True))
+    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply, pass_job_queue=True))
+    dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply, pass_job_queue=True))
+    dispatcher.add_handler(CommandHandler('start', handle_users_reply, pass_job_queue=True))
 
     logger.info('Бот Интернет-магазина в Telegram запущен')
     updater.start_polling()
