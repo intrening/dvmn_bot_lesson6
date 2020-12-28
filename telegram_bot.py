@@ -5,7 +5,11 @@ import requests
 
 from telegram_logger import TelegramLogsHandler
 from telegram.ext import Filters, Updater
-from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
+from telegram.ext import (
+    CallbackQueryHandler, CommandHandler, MessageHandler,
+    PreCheckoutQueryHandler,
+)
+from telegram import LabeledPrice
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from validate_email import validate_email
 from geopy import distance
@@ -286,6 +290,7 @@ def handle_waiting_delivery_choice(bot, update, job_queue):
             text=f'Мы начали готовить пиццу, заберите ее по адресу: {pizzeria["address"]}',
             chat_id=query.message.chat_id,
         )
+        send_invoice(bot, update, job_queue)
         return 'START'
     bot.send_message(
         text=f'Клиент заказал пиццу, надо доставить',
@@ -296,6 +301,7 @@ def handle_waiting_delivery_choice(bot, update, job_queue):
         longitude=customer_address['longitude'],
         latitude=customer_address['latitude'],
     )
+    send_invoice(bot, update, job_queue)
     return 'HANDLE_WAITING_ADDRESS'
 
 
@@ -321,6 +327,34 @@ def fetch_coordinates(apikey, place):
         return lon, lat
     except IndexError:
         return None
+
+
+def send_invoice(bot, update, job_queue):
+    chat_id = update.callback_query.message.chat_id
+    title = "Оплата за пиццу"
+    description = "Тестовая оплата за пиццу"
+    payload = "Custom-Payload"
+    provider_token = os.getenv('TRANZZO_API')
+    start_parameter = "test-payment"
+    currency = "RUB"
+    price = int(float(get_total_price(chat_id).replace(' ',''))*100)
+    prices = [LabeledPrice("Test", price)]
+
+    bot.sendInvoice(chat_id, title, description, payload,
+                    provider_token, start_parameter, currency, prices)
+
+
+def precheckout_callback(bot, update):
+    query = update.pre_checkout_query
+    if query.invoice_payload != 'Custom-Payload':
+        bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=False,
+                                      error_message="Something went wrong...")
+    else:
+        bot.answer_pre_checkout_query(pre_checkout_query_id=query.id, ok=True)
+
+
+def successful_payment_callback(bot, update):
+    update.message.reply_text("Оплата успешно получена!")
 
 
 def handle_users_reply(bot, update, job_queue):
@@ -385,6 +419,9 @@ if __name__ == '__main__':
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply, pass_job_queue=True))
     dispatcher.add_handler(MessageHandler(Filters.location, handle_users_reply, pass_job_queue=True))
     dispatcher.add_handler(CommandHandler('start', handle_users_reply, pass_job_queue=True))
+
+    dispatcher.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    dispatcher.add_handler(MessageHandler(Filters.successful_payment, successful_payment_callback))
 
     logger.info('Бот Интернет-магазина в Telegram запущен')
     updater.start_polling()
