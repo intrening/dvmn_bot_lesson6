@@ -1,7 +1,6 @@
 import os
 import logging
 import redis
-import requests
 
 from telegram_logger import TelegramLogsHandler
 from telegram.ext import Filters, Updater
@@ -12,7 +11,6 @@ from telegram.ext import (
 from telegram import LabeledPrice
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from validate_email import validate_email
-from geopy import distance
 
 from elasticpath import (
     fetch_products, get_product, get_image_url,
@@ -20,6 +18,7 @@ from elasticpath import (
     remove_from_cart, create_customer, get_entries,
     create_entry,
 )
+from pizzeria_distance import get_nearest_pizzeria, fetch_coordinates
 
 _database = None
 logger = logging.getLogger("dvmn_bot_telegram")
@@ -293,7 +292,7 @@ def handle_waiting_delivery_choice(bot, update, job_queue):
         send_invoice(bot, update, job_queue)
         return 'START'
     bot.send_message(
-        text=f'Клиент заказал пиццу, надо доставить',
+        text='Клиент заказал пиццу, надо доставить',
         chat_id=pizzeria['deliver_telegram_id'],
     )
     bot.send_location(
@@ -303,30 +302,6 @@ def handle_waiting_delivery_choice(bot, update, job_queue):
     )
     send_invoice(bot, update, job_queue)
     return 'HANDLE_WAITING_ADDRESS'
-
-
-def get_nearest_pizzeria(current_pos):
-    pizzerias = get_entries('pizzeria')
-    for pizzeria in pizzerias:
-        pizzeria['distance'] = distance.distance(
-            (pizzeria['Longitude'], pizzeria['Latitude']),
-            current_pos,
-        ).km
-    return min(pizzerias, key=lambda x: x['distance'])
-
-
-def fetch_coordinates(apikey, place):
-    base_url = "https://geocode-maps.yandex.ru/1.x"
-    params = {"geocode": place, "apikey": apikey, "format": "json"}
-    response = requests.get(base_url, params=params)
-    response.raise_for_status()
-    try:
-        places_found = response.json()['response']['GeoObjectCollection']['featureMember']
-        most_relevant = places_found[0]
-        lon, lat = most_relevant['GeoObject']['Point']['pos'].split(" ")
-        return lon, lat
-    except IndexError:
-        return None
 
 
 def send_invoice(bot, update, job_queue):
