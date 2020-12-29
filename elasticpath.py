@@ -142,19 +142,21 @@ def upload_file(file_url, public=True):
     response = requests.get(file_url)
     response.raise_for_status()
     filename = file_url.split('/')[-1]
-    with open(filename, 'wb') as f:
-        f.write(response.content)
-    url = 'https://api.moltin.com/v2/files'
-    headers = {
-        'Authorization': f'Bearer {get_ep_access_token()}',
-    }
-    files = {
-        'file': (filename, open(filename, 'rb')),
-        'public': (None, 'true'),
-    }
-    response = requests.post(url, files=files, headers=headers)
-    response.raise_for_status()
-    os.remove(filename)
+    try:
+        with open(filename, 'wb') as f:
+            f.write(response.content)
+        url = 'https://api.moltin.com/v2/files'
+        headers = {
+            'Authorization': f'Bearer {get_ep_access_token()}',
+        }
+        files = {
+            'file': (filename, open(filename, 'rb')),
+            'public': (None, 'true'),
+        }
+        response = requests.post(url, files=files, headers=headers)
+        response.raise_for_status()
+    finally:
+        os.remove(filename)
     return response.json()['data']['id']
 
 
