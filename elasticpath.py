@@ -138,7 +138,7 @@ def create_product(name, slug, sku, description, amount, currency='RUB', manage_
     return response.json()['data']['id']
 
 
-def create_file(file_url, public=True):
+def upload_file(file_url, public=True):
     response = requests.get(file_url)
     response.raise_for_status()
     filename = file_url.split('/')[-1]
