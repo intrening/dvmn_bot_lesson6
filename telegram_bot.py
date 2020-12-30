@@ -195,10 +195,7 @@ def get_menu_keyboard_markup(page=1):
 
 
 def handle_waiting_address(bot, update, job_queue):
-    if update.edited_message:
-        message = update.edited_message
-    else:
-        message = update.message
+    message = update.effective_message
     if message.location:
         current_pos = (message.location.latitude, message.location.longitude)
     else:
