@@ -80,9 +80,8 @@ def handle_menu(bot, update, job_queue):
         return 'HANDLE_MENU'
 
     product = get_product(product_id=query.data)
-    price = product['price'][0]['amount']
-    currency = product['price'][0]['currency']
-    product_info = f"{product['name']}\n{product['description']}\nЦена {price} {currency}\n"
+    price_data, *_ = product['price']
+    product_info = f"{product['name']}\n{product['description']}\nЦена {price_data['amount']} {price_data['currency']}\n"
     image_url = get_image_url(
         id=product['relationships']['main_image']['data']['id']
     )
@@ -242,10 +241,11 @@ def handle_waiting_address(bot, update, job_queue):
         похоже, придется ехать к вам на машине. Доставка с пиццерии по адресу {pizzeria_address}
         будет стоить 300 руб.
         '''
+    longitude, latitude = current_pos
     create_entry(flow_slug='customeraddress', data={
         'telegram_chat_id': update.message.chat_id,
-        'longitude': current_pos[0],
-        'latitude': current_pos[1],
+        'longitude': longitude,
+        'latitude': latitude,
     })
     bot.send_message(
         text=text,
@@ -274,9 +274,9 @@ def handle_waiting_delivery_choice(bot, update, job_queue):
     query = update.callback_query
     job_queue.run_once(callback_alarm, DELIVERY_TIME, context=query.message.chat_id)
     customer_addresses = get_entries('customeraddress')
-    customer_address = [
+    customer_address, *_ = [
         address for address in customer_addresses if address['telegram_chat_id'] == str(query.message.chat_id)
-    ][0]
+    ]
     pizzeria = get_nearest_pizzeria(
         (customer_address['longitude'], customer_address['latitude'])
     )
